@@ -189,6 +189,9 @@ AuthProcessor:
 		case strings.Contains(resBodyStr, "KmsiInterrupt"):
 			logger.Debug("processing KmsiInterrupt")
 			res, err = ac.processKmsiInterrupt(res, resBodyStr)
+		case strings.Contains(resBodyStr, "ConvergedConditionalAccess"):
+			logger.Debug("processing ConvergedConditionalAccess")
+			res, err = ac.processConvergedConditionalAccess(res, resBodyStr, loginDetails)
 		case strings.Contains(resBodyStr, "ConvergedTFA"):
 			logger.Debug("processing ConvergedTFA")
 			res, err = ac.processConvergedTFA(res, resBodyStr, loginDetails)
@@ -207,7 +210,13 @@ AuthProcessor:
 				if err := ac.unmarshalEmbeddedJson(resBodyStr, &convergedResponse); err != nil {
 					return samlAssertion, errors.Wrap(err, "unmarshal error")
 				}
-				logger.Debug("unknown process step found:", convergedResponse.Pgid)
+				logger.Warn("unknown process step found:", convergedResponse.Pgid, "- this may indicate Azure AD has updated their authentication flow")
+
+				// Try to extract SAML assertion anyway before giving up
+				if samlAssertion, _ = ac.getSamlAssertion(resBodyStr); samlAssertion != "" {
+					logger.Debug("SAML assertion found in unknown process step response")
+					return samlAssertion, nil
+				}
 			} else {
 				logger.Debug("reached an unknown page within the authentication process")
 			}
@@ -403,6 +412,60 @@ func (ac *Client) processKmsiInterrupt(res *http.Response, srcBodyStr string) (*
 		return res, errors.Wrap(err, "error retrieving KMSI results")
 	}
 	ac.client.EnableFollowRedirect()
+
+	return res, nil
+}
+
+// processConvergedConditionalAccess handles Azure AD Conditional Access challenges
+// This occurs when conditional access policies require device compliance verification
+// or additional authentication before allowing access
+func (ac *Client) processConvergedConditionalAccess(res *http.Response, srcBodyStr string, loginDetails *creds.LoginDetails) (*http.Response, error) {
+	var convergedResponse *ConvergedResponse
+	var err error
+
+	logger.Debug("Conditional Access policy detected - processing challenge")
+
+	if err := ac.unmarshalEmbeddedJson(srcBodyStr, &convergedResponse); err != nil {
+		return res, errors.Wrap(err, "ConvergedConditionalAccess response unmarshal error")
+	}
+
+	// Conditional Access may require additional MFA or device compliance checks
+	// Extract the context token and flow token for the next request
+	if convergedResponse.SCtx == "" || convergedResponse.SFT == "" {
+		return res, fmt.Errorf("missing context or flow token in Conditional Access response")
+	}
+
+	// Check if there are MFA proofs available
+	if len(convergedResponse.ArrUserProofs) > 0 {
+		logger.Debug("MFA required by Conditional Access policy")
+		res, err = ac.processMfa(convergedResponse.ArrUserProofs, convergedResponse, loginDetails)
+		if err != nil {
+			return res, errors.Wrap(err, "error processing MFA during Conditional Access")
+		}
+	} else {
+		// If no MFA required, continue with the flow using the URLs provided
+		logger.Debug("Proceeding with Conditional Access flow without additional MFA")
+
+		// Use the URLPost to continue the authentication flow
+		if convergedResponse.URLPost != "" {
+			formValues := url.Values{}
+			formValues.Set(convergedResponse.SFTName, convergedResponse.SFT)
+			formValues.Set("ctx", convergedResponse.SCtx)
+			formValues.Set("login", convergedResponse.SPOSTUsername)
+
+			req, err := http.NewRequest("POST", convergedResponse.URLPost, strings.NewReader(formValues.Encode()))
+			if err != nil {
+				return res, errors.Wrap(err, "error building Conditional Access continuation request")
+			}
+
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+			res, err = ac.client.Do(req)
+			if err != nil {
+				return res, errors.Wrap(err, "error retrieving Conditional Access continuation results")
+			}
+		}
+	}
 
 	return res, nil
 }
