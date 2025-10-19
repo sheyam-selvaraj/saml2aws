@@ -698,20 +698,77 @@ func (ac *Client) processConvergedConditionalAccess(res *http.Response, srcBodyS
 	if convergedResponse.SCtx != "" {
 		formValues.Set("ctx", convergedResponse.SCtx)
 	}
+	// Add additional fields that might be required for conditional access
+	if convergedResponse.Canary != "" {
+		formValues.Set("canary", convergedResponse.Canary)
+	}
+	if convergedResponse.Hpgact != 0 {
+		formValues.Set("hpgact", fmt.Sprintf("%d", convergedResponse.Hpgact))
+	}
+	if convergedResponse.Hpgid != 0 {
+		formValues.Set("hpgid", fmt.Sprintf("%d", convergedResponse.Hpgid))
+	}
+	if convergedResponse.Pgid != "" {
+		formValues.Set("pgid", convergedResponse.Pgid)
+	}
 
-	// For conditional access, we need to submit the form to continue
-	// If no URLPost is available, this might be a terminal state
-	if convergedResponse.URLPost == "" {
+	// Determine the appropriate URL to use for conditional access continuation
+	var postURL string
+	logger.Debug("URLPost:", convergedResponse.URLPost)
+	logger.Debug("URLEndAuth:", convergedResponse.URLEndAuth)
+	logger.Debug("URLBeginAuth:", convergedResponse.URLBeginAuth)
+	logger.Debug("Pgid:", convergedResponse.Pgid)
+	
+	if convergedResponse.URLPost != "" {
+		postURL = convergedResponse.URLPost
+		logger.Debug("Using URLPost for conditional access")
+	} else if convergedResponse.URLEndAuth != "" {
+		postURL = convergedResponse.URLEndAuth
+		logger.Debug("Using URLEndAuth for conditional access")
+	} else if convergedResponse.URLBeginAuth != "" {
+		postURL = convergedResponse.URLBeginAuth
+		logger.Debug("Using URLBeginAuth for conditional access")
+	}
+
+	// If no suitable URL is found, try alternative approaches
+	if postURL == "" {
+		// Check for specific conditional access scenarios based on Pgid
+		switch convergedResponse.Pgid {
+		case "ConvergedConditionalAccess":
+			// This is likely a device compliance check or terms of use acceptance
+			logger.Debug("Handling ConvergedConditionalAccess page without continuation URL")
+			// Try to find any form in the page
+			if formAction := ac.extractFormAction(srcBodyStr); formAction != "" {
+				postURL = formAction
+				logger.Debug("Found form action:", formAction)
+			}
+		}
+		
 		// Look for any hidden form in the current page
-		if ac.isHiddenForm(srcBodyStr) {
+		if postURL == "" && ac.isHiddenForm(srcBodyStr) {
+			logger.Debug("Found hidden form, processing...")
 			return ac.reProcessForm(srcBodyStr)
 		}
-		// If no form action is available, this might be a conditional access block
-		return res, fmt.Errorf("conditional access policy may be blocking authentication - no continuation URL found")
+		
+		// Try to extract form action from HTML if not already found
+		if postURL == "" {
+			if formAction := ac.extractFormAction(srcBodyStr); formAction != "" {
+				postURL = formAction
+				logger.Debug("Using extracted form action:", formAction)
+			} else {
+				// If no form action is available, this might be a conditional access block
+				logger.Debug("No continuation URL found in conditional access response")
+				logger.Debug("Response contains error:", convergedResponse.SErrTxt)
+				if convergedResponse.SErrTxt != "" {
+					return res, fmt.Errorf("conditional access error: %s", convergedResponse.SErrTxt)
+				}
+				return res, fmt.Errorf("conditional access policy may be blocking authentication - no continuation URL found")
+			}
+		}
 	}
 
 	// Submit the conditional access form
-	req, err := http.NewRequest("POST", ac.fullUrl(res, convergedResponse.URLPost), strings.NewReader(formValues.Encode()))
+	req, err := http.NewRequest("POST", ac.fullUrl(res, postURL), strings.NewReader(formValues.Encode()))
 	if err != nil {
 		return res, errors.Wrap(err, "error building ConvergedConditionalAccess request")
 	}
@@ -828,6 +885,24 @@ func (ac *Client) reSubmitFormData(resBodyStr string) (url.Values, string, error
 	})
 
 	return formValues, formSubmitUrl, nil
+}
+
+func (ac *Client) extractFormAction(resBodyStr string) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(resBodyStr))
+	if err != nil {
+		return ""
+	}
+	
+	// Look for forms with action attributes
+	var formAction string
+	doc.Find("form").Each(func(i int, form *goquery.Selection) {
+		if action, exists := form.Attr("action"); exists && action != "" {
+			formAction = action
+			return // Stop at first form with action
+		}
+	})
+	
+	return formAction
 }
 
 func (ac *Client) getSamlAssertion(resBodyStr string) (string, error) {
