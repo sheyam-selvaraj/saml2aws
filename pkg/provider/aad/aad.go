@@ -173,7 +173,7 @@ func (ac *Client) Authenticate(loginDetails *creds.LoginDetails) (string, error)
 	}
 
 AuthProcessor:
-	for {
+	for loopCounter := 0; loopCounter < 50; loopCounter++ { // Add loop protection
 		resBody, _ = io.ReadAll(res.Body)
 		resBodyStr = string(resBody)
 		// reset res.Body so it can be read again later if required
@@ -218,6 +218,11 @@ AuthProcessor:
 		}
 		if err != nil {
 			return samlAssertion, err
+		}
+
+		// If we've hit the loop limit, it's likely an infinite loop
+		if loopCounter >= 49 {
+			return samlAssertion, errors.New("authentication process stuck in loop - possible conditional access policy blocking")
 		}
 	}
 
@@ -694,22 +699,45 @@ func (ac *Client) processConvergedConditionalAccess(res *http.Response, srcBodyS
 		formValues.Set("ctx", convergedResponse.SCtx)
 	}
 
-	// If there's a URL to post to, use it; otherwise try to continue
-	var req *http.Request
-	if convergedResponse.URLPost != "" {
-		req, err = http.NewRequest("POST", ac.fullUrl(res, convergedResponse.URLPost), strings.NewReader(formValues.Encode()))
-		if err != nil {
-			return res, errors.Wrap(err, "error building ConvergedConditionalAccess request")
+	// For conditional access, we need to submit the form to continue
+	// If no URLPost is available, this might be a terminal state
+	if convergedResponse.URLPost == "" {
+		// Look for any hidden form in the current page
+		if ac.isHiddenForm(srcBodyStr) {
+			return ac.reProcessForm(srcBodyStr)
 		}
-		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		
-		res, err = ac.client.Do(req)
-		if err != nil {
-			return res, errors.Wrap(err, "error processing ConvergedConditionalAccess request")
+		// If no form action is available, this might be a conditional access block
+		return res, fmt.Errorf("conditional access policy may be blocking authentication - no continuation URL found")
+	}
+
+	// Submit the conditional access form
+	req, err := http.NewRequest("POST", ac.fullUrl(res, convergedResponse.URLPost), strings.NewReader(formValues.Encode()))
+	if err != nil {
+		return res, errors.Wrap(err, "error building ConvergedConditionalAccess request")
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	
+	// Disable redirects temporarily to see what the server returns
+	ac.client.DisableFollowRedirect()
+	newRes, err := ac.client.Do(req)
+	ac.client.EnableFollowRedirect()
+	
+	if err != nil {
+		return res, errors.Wrap(err, "error processing ConvergedConditionalAccess request")
+	}
+
+	// If we get a redirect, follow it manually
+	if newRes.StatusCode >= 300 && newRes.StatusCode < 400 {
+		location := newRes.Header.Get("Location")
+		if location != "" {
+			newRes, err = ac.client.Get(ac.fullUrl(newRes, location))
+			if err != nil {
+				return res, errors.Wrap(err, "error following ConvergedConditionalAccess redirect")
+			}
 		}
 	}
 
-	return res, nil
+	return newRes, nil
 }
 
 func (ac *Client) unmarshalEmbeddedJson(resBodyStr string, v any) error {
