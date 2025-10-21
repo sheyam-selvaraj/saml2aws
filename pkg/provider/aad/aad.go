@@ -200,20 +200,29 @@ AuthProcessor:
 		// reset res.Body so it can be read again later if required
 		res.Body = io.NopCloser(bytes.NewBuffer(resBody))
 
+		// First try to parse the embedded JSON to get the Pgid for more reliable detection
+		var tempConvergedResponse *ConvergedResponse
+		var pgid string
+		if strings.Contains(resBodyStr, "$Config") {
+			if err := ac.unmarshalEmbeddedJson(resBodyStr, &tempConvergedResponse); err == nil {
+				pgid = tempConvergedResponse.Pgid
+			}
+		}
+
 		switch {
-		case strings.Contains(resBodyStr, "ConvergedSignIn"):
+		case strings.Contains(resBodyStr, "ConvergedSignIn") || pgid == "ConvergedSignIn":
 			logger.Debug("processing ConvergedSignIn")
 			res, err = ac.processConvergedSignIn(res, resBodyStr, loginDetails)
-		case strings.Contains(resBodyStr, "ConvergedProofUpRedirect"):
+		case strings.Contains(resBodyStr, "ConvergedProofUpRedirect") || pgid == "ConvergedProofUpRedirect":
 			logger.Debug("processing ConvergedProofUpRedirect")
 			res, err = ac.processConvergedProofUpRedirect(res, resBodyStr)
-		case strings.Contains(resBodyStr, "KmsiInterrupt"):
+		case strings.Contains(resBodyStr, "KmsiInterrupt") || pgid == "KmsiInterrupt":
 			logger.Debug("processing KmsiInterrupt")
 			res, err = ac.processKmsiInterrupt(res, resBodyStr)
-		case strings.Contains(resBodyStr, "ConvergedTFA"):
+		case strings.Contains(resBodyStr, "ConvergedTFA") || pgid == "ConvergedTFA":
 			logger.Debug("processing ConvergedTFA")
 			res, err = ac.processConvergedTFA(res, resBodyStr, loginDetails)
-		case strings.Contains(resBodyStr, "ConvergedConditionalAccess"):
+		case strings.Contains(resBodyStr, "ConvergedConditionalAccess") || pgid == "ConvergedConditionalAccess":
 			logger.Debug("processing ConvergedConditionalAccess")
 			res, err = ac.processConvergedConditionalAccess(res, resBodyStr, loginDetails)
 		case strings.Contains(resBodyStr, "SAMLRequest"):
