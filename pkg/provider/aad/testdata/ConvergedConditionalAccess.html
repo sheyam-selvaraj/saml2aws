@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Conditional Access</title>
+</head>
+<body>
+    <script type="text/javascript">
+        $Config={
+            "sErrorCode": "53003",
+            "sErrTxt": "Device compliance required. Your device must be managed by your organization.",
+            "sFT": "test-flow-token",
+            "sFTName": "flowToken",
+            "sCtx": "test-context",
+            "urlPost": "https://login.microsoftonline.com/common/oauth2/authorize",
+            "canary": "test-canary",
+            "sessionId": "test-session-id",
+            "pgid": "ConvergedConditionalAccess",
+            "deviceRegisterUrl": "https://device.login.microsoftonline.com/",
+            "requiredActions": ["device_registration"]
+        };
+    </script>
+</body>
+</html>
