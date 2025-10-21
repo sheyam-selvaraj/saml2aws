@@ -137,15 +137,15 @@ type userProof struct {
 // ConditionalAccessResponse struct for handling conditional access policy responses
 type ConditionalAccessResponse struct {
 	// Standard fields from ConvergedResponse
-	SErrorCode    string `json:"sErrorCode"`
-	SErrTxt       string `json:"sErrTxt"`
-	SFT           string `json:"sFT"`
-	SFTName       string `json:"sFTName"`
-	SCtx          string `json:"sCtx"`
-	URLPost       string `json:"urlPost"`
-	Canary        string `json:"canary"`
-	SessionID     string `json:"sessionId"`
-	
+	SErrorCode string `json:"sErrorCode"`
+	SErrTxt    string `json:"sErrTxt"`
+	SFT        string `json:"sFT"`
+	SFTName    string `json:"sFTName"`
+	SCtx       string `json:"sCtx"`
+	URLPost    string `json:"urlPost"`
+	Canary     string `json:"canary"`
+	SessionID  string `json:"sessionId"`
+
 	// Conditional Access specific fields
 	PolicyType        string   `json:"policyType,omitempty"`
 	PolicyMessage     string   `json:"policyMessage,omitempty"`
@@ -711,19 +711,19 @@ func (ac *Client) processConvergedConditionalAccess(res *http.Response, srcBodyS
 
 	// Log raw response details for debugging (excluding sensitive data)
 	logger.WithFields(logrus.Fields{
-		"pgid":               conditionalAccessResponse.Pgid,
-		"errorCode":          conditionalAccessResponse.SErrorCode,
-		"hasErrorText":       conditionalAccessResponse.SErrTxt != "",
+		"pgid":                 conditionalAccessResponse.Pgid,
+		"errorCode":            conditionalAccessResponse.SErrorCode,
+		"hasErrorText":         conditionalAccessResponse.SErrTxt != "",
 		"hasDeviceRegisterURL": conditionalAccessResponse.DeviceRegisterURL != "",
-		"hasComplianceURL":   conditionalAccessResponse.ComplianceURL != "",
-		"hasRequiredActions": len(conditionalAccessResponse.RequiredActions) > 0,
+		"hasComplianceURL":     conditionalAccessResponse.ComplianceURL != "",
+		"hasRequiredActions":   len(conditionalAccessResponse.RequiredActions) > 0,
 		"requiredActionsCount": len(conditionalAccessResponse.RequiredActions),
-		"sessionIdPresent":   conditionalAccessResponse.SessionID != "",
+		"sessionIdPresent":     conditionalAccessResponse.SessionID != "",
 	}).Debug("Conditional access response details")
 
 	// Detect policy type based on response content
 	policyType := ac.detectConditionalAccessPolicyType(conditionalAccessResponse, srcBodyStr)
-	
+
 	// Log policy detection results
 	logger.WithFields(logrus.Fields{
 		"detectedPolicyType": policyType,
@@ -864,39 +864,39 @@ func (ac *Client) logPolicySpecificDetails(policyType string, caResp *Conditiona
 	switch policyType {
 	case "device_compliance":
 		logger.WithFields(logrus.Fields{
-			"policyType":         policyType,
+			"policyType":           policyType,
 			"hasDeviceRegisterURL": caResp.DeviceRegisterURL != "",
-			"hasComplianceURL":   caResp.ComplianceURL != "",
+			"hasComplianceURL":     caResp.ComplianceURL != "",
 		}).Debug("Device compliance policy details")
-		
+
 		if caResp.DeviceRegisterURL != "" {
 			logger.WithFields(logrus.Fields{
 				"deviceRegisterURLPresent": true,
 			}).Debug("Device registration URL available for resolution")
 		}
-		
+
 	case "location_based":
 		logger.WithFields(logrus.Fields{
 			"policyType": policyType,
 		}).Debug("Location-based policy detected - manual resolution required")
-		
+
 	case "application_based":
 		logger.WithFields(logrus.Fields{
 			"policyType":         policyType,
 			"hasRequiredActions": len(caResp.RequiredActions) > 0,
 		}).Debug("Application-based policy details")
-		
+
 		if len(caResp.RequiredActions) > 0 {
 			logger.WithFields(logrus.Fields{
 				"requiredActionsCount": len(caResp.RequiredActions),
 			}).Debug("Required actions specified for application policy")
 		}
-		
+
 	case "risk_based":
 		logger.WithFields(logrus.Fields{
 			"policyType": policyType,
 		}).Debug("Risk-based policy detected - identity verification required")
-		
+
 	default:
 		logger.WithFields(logrus.Fields{
 			"policyType": policyType,
@@ -908,24 +908,24 @@ func (ac *Client) logPolicySpecificDetails(policyType string, caResp *Conditiona
 // logResolutionOptions logs available resolution options and URLs
 func (ac *Client) logResolutionOptions(caResp *ConditionalAccessResponse) {
 	resolutionOptions := make(map[string]interface{})
-	
+
 	if caResp.DeviceRegisterURL != "" {
 		resolutionOptions["deviceRegistration"] = true
 		logger.Debug("Device registration URL available for manual resolution")
 	}
-	
+
 	if caResp.ComplianceURL != "" {
 		resolutionOptions["complianceCheck"] = true
 		logger.Debug("Compliance URL available for manual resolution")
 	}
-	
+
 	if len(caResp.RequiredActions) > 0 {
 		resolutionOptions["requiredActions"] = len(caResp.RequiredActions)
 		logger.WithFields(logrus.Fields{
 			"actionsCount": len(caResp.RequiredActions),
 		}).Debug("Required actions specified for policy resolution")
 	}
-	
+
 	if len(resolutionOptions) == 0 {
 		logger.Debug("No automatic resolution options available - manual intervention required")
 	} else {
@@ -938,7 +938,7 @@ func (ac *Client) logResolutionOptions(caResp *ConditionalAccessResponse) {
 // detectConditionalAccessPolicyType analyzes the conditional access response to determine the policy type
 func (ac *Client) detectConditionalAccessPolicyType(caResp *ConditionalAccessResponse, srcBodyStr string) string {
 	logger.Debug("Starting conditional access policy type detection")
-	
+
 	// Check for explicit policy type in response
 	if caResp.PolicyType != "" {
 		logger.WithFields(logrus.Fields{
@@ -953,9 +953,9 @@ func (ac *Client) detectConditionalAccessPolicyType(caResp *ConditionalAccessRes
 	bodyContent := strings.ToLower(srcBodyStr)
 
 	logger.WithFields(logrus.Fields{
-		"errorCode":        errorCode,
-		"hasErrorMessage":  errorMessage != "",
-		"bodyContentSize":  len(bodyContent),
+		"errorCode":       errorCode,
+		"hasErrorMessage": errorMessage != "",
+		"bodyContentSize": len(bodyContent),
 	}).Debug("Analyzing response content for policy type detection")
 
 	// Device compliance policy detection
@@ -1015,7 +1015,7 @@ func (ac *Client) detectConditionalAccessPolicyType(caResp *ConditionalAccessRes
 		"detectedType": "unknown",
 		"errorCode":    errorCode,
 	}).Debug("No specific policy type pattern detected - defaulting to unknown")
-	
+
 	return "unknown"
 }
 
@@ -1081,14 +1081,14 @@ func (ac *Client) validateMicrosoftURL(urlStr string) bool {
 	}
 
 	hostname := strings.ToLower(parsedURL.Hostname())
-	
+
 	// Check exact domain matches
 	for _, domain := range trustedDomains {
 		if hostname == domain {
 			logger.WithFields(logrus.Fields{
-				"url":            urlStr,
-				"hostname":       hostname,
-				"matchedDomain":  domain,
+				"url":              urlStr,
+				"hostname":         hostname,
+				"matchedDomain":    domain,
 				"validationResult": "trusted",
 			}).Debug("URL validated as trusted Microsoft domain")
 			return true
@@ -1106,8 +1106,8 @@ func (ac *Client) validateMicrosoftURL(urlStr string) bool {
 	for _, subdomain := range microsoftSubdomains {
 		if strings.HasSuffix(hostname, subdomain) {
 			logger.WithFields(logrus.Fields{
-				"url":            urlStr,
-				"hostname":       hostname,
+				"url":              urlStr,
+				"hostname":         hostname,
 				"matchedSubdomain": subdomain,
 				"validationResult": "trusted_subdomain",
 			}).Debug("URL validated as trusted Microsoft subdomain")
@@ -1116,18 +1116,18 @@ func (ac *Client) validateMicrosoftURL(urlStr string) bool {
 	}
 
 	logger.WithFields(logrus.Fields{
-		"url":            urlStr,
-		"hostname":       hostname,
+		"url":              urlStr,
+		"hostname":         hostname,
 		"validationResult": "untrusted",
 	}).Debug("URL validation failed - not a trusted Microsoft domain")
-	
+
 	return false
 }
 
 // extractAndValidateURLs extracts URLs from conditional access response and validates them
 func (ac *Client) extractAndValidateURLs(caResp *ConditionalAccessResponse) map[string]string {
 	validatedURLs := make(map[string]string)
-	
+
 	logger.Debug("Starting URL extraction and validation from conditional access response")
 
 	// Extract and validate device registration URL
@@ -1135,14 +1135,14 @@ func (ac *Client) extractAndValidateURLs(caResp *ConditionalAccessResponse) map[
 		if ac.validateMicrosoftURL(caResp.DeviceRegisterURL) {
 			validatedURLs["deviceRegistration"] = caResp.DeviceRegisterURL
 			logger.WithFields(logrus.Fields{
-				"urlType": "deviceRegistration",
+				"urlType":   "deviceRegistration",
 				"validated": true,
 			}).Debug("Device registration URL extracted and validated")
 		} else {
 			logger.WithFields(logrus.Fields{
-				"urlType": "deviceRegistration",
+				"urlType":   "deviceRegistration",
 				"validated": false,
-				"reason": "untrusted_domain",
+				"reason":    "untrusted_domain",
 			}).Debug("Device registration URL rejected - untrusted domain")
 		}
 	}
@@ -1152,14 +1152,14 @@ func (ac *Client) extractAndValidateURLs(caResp *ConditionalAccessResponse) map[
 		if ac.validateMicrosoftURL(caResp.ComplianceURL) {
 			validatedURLs["compliance"] = caResp.ComplianceURL
 			logger.WithFields(logrus.Fields{
-				"urlType": "compliance",
+				"urlType":   "compliance",
 				"validated": true,
 			}).Debug("Compliance URL extracted and validated")
 		} else {
 			logger.WithFields(logrus.Fields{
-				"urlType": "compliance",
+				"urlType":   "compliance",
 				"validated": false,
-				"reason": "untrusted_domain",
+				"reason":    "untrusted_domain",
 			}).Debug("Compliance URL rejected - untrusted domain")
 		}
 	}
@@ -1175,17 +1175,17 @@ func (ac *Client) extractAndValidateURLs(caResp *ConditionalAccessResponse) map[
 // generateActionableGuidance creates detailed guidance based on policy type and available URLs
 func (ac *Client) generateActionableGuidance(policyType string, validatedURLs map[string]string, caResp *ConditionalAccessResponse) string {
 	var guidance strings.Builder
-	
+
 	logger.WithFields(logrus.Fields{
 		"policyType": policyType,
-		"urlCount": len(validatedURLs),
+		"urlCount":   len(validatedURLs),
 	}).Debug("Generating actionable guidance for conditional access policy")
 
 	switch policyType {
 	case "device_compliance":
 		guidance.WriteString("DEVICE COMPLIANCE REQUIRED:\n")
 		guidance.WriteString("Your device does not meet your organization's compliance requirements.\n\n")
-		
+
 		if deviceURL, exists := validatedURLs["deviceRegistration"]; exists {
 			guidance.WriteString("IMMEDIATE ACTION REQUIRED:\n")
 			guidance.WriteString(fmt.Sprintf("1. Visit the device registration portal: %s\n", deviceURL))
@@ -1193,13 +1193,13 @@ func (ac *Client) generateActionableGuidance(policyType string, validatedURLs ma
 			guidance.WriteString("3. Wait for compliance evaluation (may take up to 24 hours)\n")
 			guidance.WriteString("4. Retry authentication after compliance is confirmed\n\n")
 		}
-		
+
 		if complianceURL, exists := validatedURLs["compliance"]; exists {
 			guidance.WriteString("COMPLIANCE CHECK:\n")
 			guidance.WriteString(fmt.Sprintf("• Check device compliance status: %s\n", complianceURL))
 			guidance.WriteString("• Resolve any compliance issues identified\n\n")
 		}
-		
+
 		if len(validatedURLs) == 0 {
 			guidance.WriteString("MANUAL STEPS REQUIRED:\n")
 			guidance.WriteString("• Contact your IT administrator for device enrollment assistance\n")
@@ -1223,7 +1223,7 @@ func (ac *Client) generateActionableGuidance(policyType string, validatedURLs ma
 		guidance.WriteString("• Contact your IT administrator for application approval\n")
 		guidance.WriteString("• Request necessary permissions for saml2aws access\n")
 		guidance.WriteString("• Verify the application is properly configured in Azure AD\n\n")
-		
+
 		if len(caResp.RequiredActions) > 0 {
 			guidance.WriteString("SPECIFIC REQUIREMENTS:\n")
 			for i, action := range caResp.RequiredActions {
@@ -1263,11 +1263,11 @@ func (ac *Client) generateActionableGuidance(policyType string, validatedURLs ma
 	}
 
 	guidanceText := guidance.String()
-	
+
 	logger.WithFields(logrus.Fields{
-		"policyType": policyType,
+		"policyType":     policyType,
 		"guidanceLength": len(guidanceText),
-		"urlsIncluded": len(validatedURLs),
+		"urlsIncluded":   len(validatedURLs),
 	}).Debug("Actionable guidance generated successfully")
 
 	return guidanceText
@@ -1285,32 +1285,32 @@ func getMapKeys(m map[string]string) []string {
 // handleConditionalAccessError generates user-friendly error messages for conditional access policies
 func (ac *Client) handleConditionalAccessError(caResp *ConditionalAccessResponse, policyType string) error {
 	logger.Debug("Generating enhanced conditional access error message with URL validation")
-	
+
 	// Log comprehensive policy details for debugging (excluding sensitive information)
 	logger.WithFields(logrus.Fields{
-		"policyType":         policyType,
-		"errorCode":          caResp.SErrorCode,
-		"hasErrorMessage":    caResp.SErrTxt != "",
-		"errorMessageLength": len(caResp.SErrTxt),
-		"pgid":               caResp.Pgid,
-		"hasSessionId":       caResp.SessionID != "",
+		"policyType":           policyType,
+		"errorCode":            caResp.SErrorCode,
+		"hasErrorMessage":      caResp.SErrTxt != "",
+		"errorMessageLength":   len(caResp.SErrTxt),
+		"pgid":                 caResp.Pgid,
+		"hasSessionId":         caResp.SessionID != "",
 		"hasDeviceRegisterURL": caResp.DeviceRegisterURL != "",
-		"hasComplianceURL":   caResp.ComplianceURL != "",
+		"hasComplianceURL":     caResp.ComplianceURL != "",
 		"requiredActionsCount": len(caResp.RequiredActions),
 	}).Debug("Conditional access error details for troubleshooting")
 
 	// Extract and validate URLs from the response
 	validatedURLs := ac.extractAndValidateURLs(caResp)
-	
+
 	logger.WithFields(logrus.Fields{
-		"policyType": policyType,
+		"policyType":        policyType,
 		"validatedURLCount": len(validatedURLs),
-		"urlTypes": getMapKeys(validatedURLs),
+		"urlTypes":          getMapKeys(validatedURLs),
 	}).Debug("URL extraction and validation completed for error message")
 
 	// Generate comprehensive actionable guidance
 	guidance := ac.generateActionableGuidance(policyType, validatedURLs, caResp)
-	
+
 	// Create the main error message
 	var message strings.Builder
 	message.WriteString(guidance)
@@ -1328,12 +1328,12 @@ func (ac *Client) handleConditionalAccessError(caResp *ConditionalAccessResponse
 
 	// Log final error generation with security considerations
 	logger.WithFields(logrus.Fields{
-		"policyType":       policyType,
-		"errorCode":        caResp.SErrorCode,
-		"messageGenerated": true,
-		"guidanceIncluded": true,
+		"policyType":            policyType,
+		"errorCode":             caResp.SErrorCode,
+		"messageGenerated":      true,
+		"guidanceIncluded":      true,
 		"validatedURLsIncluded": len(validatedURLs),
-		"messageLength": len(finalMessage),
+		"messageLength":         len(finalMessage),
 	}).Debug("Enhanced conditional access error message generated successfully")
 
 	return fmt.Errorf("conditional access policy blocked authentication: %s", finalMessage)
