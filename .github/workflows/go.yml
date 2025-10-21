@@ -24,6 +24,9 @@ jobs:
           check-latest: false
           cache: true
 
+      - name: Download dependencies
+        run: go mod download
+
       - name: Test
         run: |
           go test -v ./... -coverprofile=${{ matrix.os }}_coverage.txt -covermode=atomic
