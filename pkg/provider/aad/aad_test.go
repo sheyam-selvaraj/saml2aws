@@ -687,9 +687,9 @@ func TestAad_unmarshalEmbeddedJson(t *testing.T) {
 func TestAad_processConvergedConditionalAccess_Logging(t *testing.T) {
 	// Test that the conditional access handler logs appropriately without errors
 	idpAccount := &cfg.IDPAccount{
-		URL:    "https://login.microsoftonline.com",
-		AppID:  "test-app-id",
-		MFA:    "Auto",
+		URL:   "https://login.microsoftonline.com",
+		AppID: "test-app-id",
+		MFA:   "Auto",
 	}
 
 	client, err := New(idpAccount)
@@ -733,10 +733,10 @@ func TestAad_detectConditionalAccessPolicyType_Logging(t *testing.T) {
 	require.NoError(t, err)
 
 	testCases := []struct {
-		name           string
-		response       *ConditionalAccessResponse
-		bodyContent    string
-		expectedType   string
+		name         string
+		response     *ConditionalAccessResponse
+		bodyContent  string
+		expectedType string
 	}{
 		{
 			name: "Device compliance policy",
